@@ -1,4 +1,4 @@
-setwd("C:/Users/ferlo/OneDrive/Documents/NYU/Foster (Research)/network data")
+#setwd("C:/Users/ferlo/OneDrive/Documents/NYU/Foster (Research)/network data")
 
 # Load Node features
 feat <- read.csv("107.feat", header = FALSE, sep = " ")
@@ -22,7 +22,7 @@ adj_mat[cbind(match(edges$V1, rownames(adj_mat)), match(edges$V2, colnames(adj_m
 library(igraph)
 net <- graph_from_adjacency_matrix(adj_mat, mode="undirected")
 # Evaluate force-directed graph method
-source("fdg2.R")
+source("fdg.R")
 l <- get_l(net)
 results <- matrix(0, ncol=2, nrow=ncol(feat)-1)
 rownames(results) <- colnames(feat)[-1]
