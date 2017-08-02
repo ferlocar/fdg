@@ -36,28 +36,40 @@ eval_alg <- function(net, l, adj_mat){
   folds <- get_strat_folds(data, n_folds)
   avg_auc <- 0
   bench_auc <- 0
+  both_auc <-0
   #Perform Cross Validation
   for(i in 1:n_folds){
     print(paste0("Fold ", i))
-    fold_ixs <- which(folds==i,arr.ind=TRUE)
-    train_data <- data[-fold_ixs,]
-    test_data <- data[fold_ixs,]
+    test_ixs <- which(folds==i,arr.ind=TRUE)
+    train_data <- data[-test_ixs,]
+    test_data <- data[test_ixs,]
+    # Count edges to positives (benchmark)
+    counts <- (data$y[-test_ixs] %*% adj_mat[-test_ixs,])[1,]
+    bench_auc <- bench_auc + auc(roc(counts[test_ixs], factor(test_data$y)))
+    # Add counts as part of the data
+    test_data$counts <- counts[test_ixs]
+    train_data$counts <- counts[-test_ixs]
     # Force-directed graph
     model <- svm(y~l1+l2, train_data, type="C",kernel='radial', probability=TRUE)
     y_pred <- predict(model, test_data, probability=TRUE)
     scores <- attr(y_pred, "probabilities")[,2]
     avg_auc <- avg_auc + auc(roc(scores, factor(test_data$y)))
-    # Count edges to positives (benchmark)
-    bench_scores <- (data$y[-fold_ixs] %*% adj_mat[-fold_ixs, fold_ixs])[1,]
-    bench_auc <- bench_auc + auc(roc(bench_scores, factor(test_data$y)))
+    # Both 
+    model <- svm(y~l1+l2+counts, train_data, type="C",kernel='radial', probability=TRUE)
+    y_pred <- predict(model, test_data, probability=TRUE)
+    scores <- attr(y_pred, "probabilities")[,2]
+    both_auc <- both_auc + auc(roc(scores, factor(test_data$y)))
   }
   avg_auc <- avg_auc/n_folds
   bench_auc <- bench_auc/n_folds
+  both_auc <- both_auc/n_folds
   print("Force-Directed Graph:")
   print(paste0("AVG. AUC (", n_folds, " folds): ", avg_auc))
   print("Counting edges:")
   print(paste0("Benchmark AUC (", n_folds, " folds): ", bench_auc))
-  return(c(avg_auc, bench_auc))
+  print("Edges and FD Graph:")
+  print(paste0("Both AUC (", n_folds, " folds): ", both_auc))
+  return(c(avg_auc, bench_auc, both_auc))
 }
 
 # Karate example

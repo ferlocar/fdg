@@ -1,5 +1,3 @@
-#setwd("C:/Users/ferlo/OneDrive/Documents/NYU/Foster (Research)/network data")
-
 # Load Node features
 feat <- read.csv("107.feat", header = FALSE, sep = " ")
 colnames(feat) <- gsub("V", "F", colnames(feat))
@@ -24,12 +22,16 @@ net <- graph_from_adjacency_matrix(adj_mat, mode="undirected")
 # Evaluate force-directed graph method
 source("fdg.R")
 l <- get_l(net)
-results <- matrix(0, ncol=2, nrow=ncol(feat)-1)
+results <- matrix(0, ncol=3, nrow=ncol(feat)-1)
 rownames(results) <- colnames(feat)[-1]
 
 # Test different features as dependent variables
+set.seed(0)
 for (vn in rownames(results)){
   print(vn)
   net <- set_vertex_attr(net, "y", index=V(net), feat[[vn]])
   results[vn,] <- eval_alg(net, l, adj_mat)
 }
+
+colnames(results) <- c("fdg_auc", "bench_auc", "both_auc")
+write.csv(results, file = "results.csv")
