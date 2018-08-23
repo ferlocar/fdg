@@ -3,7 +3,7 @@ library(igraphdata)
 library(e1071)
 library(AUC)
 
-get_l <- function(net, plot = FALSE){
+get_coords <- function(net, plot = FALSE){
   l <- layout_with_fr(net)
   if(plot){
     plot(net, edge.arrow.mode = 0,layout=l)
@@ -25,9 +25,9 @@ get_strat_folds <- function(data, n_folds){
   return(folds)
 }
 
-eval_alg <- function(net, l, adj_mat){
+eval_alg <- function(y, l, adj_mat, paths){
   # Set up cross-validation
-  data <- data.frame(y=as.numeric(V(net)$y),l1=l[,1],l2=l[,2], row.names = rownames(adj_mat))
+  data <- data.frame(y=y,l1=l[,1],l2=l[,2], row.names = rownames(adj_mat))
   n_folds <- min(10, sum(data$y))
   if(n_folds < 2){
     print("Not enough positive observations to perform cross validation")
@@ -37,12 +37,19 @@ eval_alg <- function(net, l, adj_mat){
   avg_auc <- 0
   bench_auc <- 0
   both_auc <-0
+  floyd_auc <-0
   #Perform Cross Validation
   for(i in 1:n_folds){
     print(paste0("Fold ", i))
     test_ixs <- which(folds==i,arr.ind=TRUE)
     train_data <- data[-test_ixs,]
     test_data <- data[test_ixs,]
+    # Use Floyd's stuff
+    f_scores <- rowSums(paths[,(data$y>0)[-test_ixs], drop=FALSE]) * -1
+    # The min_val is to do something when none of the nodes can reach a "positive node"
+    min_val <- -1024*1024
+    f_scores[is.na(f_scores)] <- min(min_val, f_scores, na.rm=TRUE)
+    floyd_auc <- floyd_auc + auc(roc(f_scores[test_ixs], factor(test_data$y)))
     # Count edges to positives (benchmark)
     counts <- (data$y[-test_ixs] %*% adj_mat[-test_ixs,])[1,]
     bench_auc <- bench_auc + auc(roc(counts[test_ixs], factor(test_data$y)))
@@ -60,6 +67,7 @@ eval_alg <- function(net, l, adj_mat){
     scores <- attr(y_pred, "probabilities")[,2]
     both_auc <- both_auc + auc(roc(scores, factor(test_data$y)))
   }
+  floyd_auc <- floyd_auc/n_folds
   avg_auc <- avg_auc/n_folds
   bench_auc <- bench_auc/n_folds
   both_auc <- both_auc/n_folds
@@ -69,7 +77,9 @@ eval_alg <- function(net, l, adj_mat){
   print(paste0("Benchmark AUC (", n_folds, " folds): ", bench_auc))
   print("Edges and FD Graph:")
   print(paste0("Both AUC (", n_folds, " folds): ", both_auc))
-  return(c(avg_auc, bench_auc, both_auc))
+  print("Floyd Algorithm:")
+  print(paste0("Floyd AUC (", n_folds, " folds): ", floyd_auc))
+  return(c(avg_auc, bench_auc, both_auc, floyd_auc))
 }
 
 # Karate example
